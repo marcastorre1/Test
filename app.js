@@ -17,7 +17,7 @@ const MANAGER = 'markulik52';
    Чтобы удалить товар — сотрите его блок { ... } целиком.
 ============================================================ */
 const products = [
-  { id:'p1', name:'Худи Oversize Black', cat:'худи', price:89, img:'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600&q=80', desc:'Плотный хлопок 320 г/м², свободный крой, вышитый логотип.' },
+  { id:'p1', name:'Худи Oversize Black', cat:'худи', price:89, img:'file_00000000c55081f4b6c864f8d996155f.png' },
   { id:'p2', name:'Футболка Essential White', cat:'футболки', price:39, img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&q=80', desc:'Тяжёлый хлопок, прямой силуэт, не садится после стирки.' },
   { id:'p3', name:'Брюки Cargo Olive', cat:'брюки', price:99, img:'https://images.unsplash.com/photo-1517438476312-10d79c077509?w=600&q=80', desc:'Карго-карманы, зауженный низ, плотная ткань рип-стоп.' },
   { id:'p4', name:'Куртка Windbreaker Purple', cat:'куртки', price:129, img:'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80', desc:'Лёгкая непродуваемая ткань, светоотражающие вставки.' },
