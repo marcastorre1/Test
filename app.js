@@ -1,71 +1,113 @@
-const tg = window.Telegram.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+document.getElementById('year').textContent = new Date().getFullYear();
 
-// ============================================
-// ⚠️ НАСТРОЙКА
-// ============================================
-const TELEGRAM_USERNAME = 'pisdezix';  // твой ник БЕЗ @
+const MANAGER = 'markulik52';
 
-// ============================================
-// ОТКРЫТИЕ TELEGRAM
-// ============================================
-function openTelegram(service) {
-    let text = 'Здравствуйте! Хочу заказать сайт.';
-    if (service) {
-        text = 'Здравствуйте! Хочу заказать: ' + service + '.';
-    } else {
-        text = 'Здравствуйте! Хочу заказать сайт. Расскажите про цены и сроки.';
-    }
-    const url = 'https://t.me/' + TELEGRAM_USERNAME + '?text=' + encodeURIComponent(text);
-    if (tg) {
-        tg.openTelegramLink(url);
-    } else {
-        window.open(url, '_blank');
-    }
+/* ============================================================
+   ТОВАРЫ — добавляйте, меняйте и удаляйте прямо здесь.
+   Каждый товар — один объект { ... } внутри массива ниже.
+   Поля:
+     id    — уникальный текст/число, не должен повторяться
+     name  — название товара
+     cat   — категория (по ней работают фильтры сверху каталога)
+     price — цена в евро, просто число, без символа €
+     img   — ссылка на фото товара
+     desc  — короткое описание
+   Чтобы добавить товар — скопируйте один блок { ... }, вставьте
+   запятую после последнего блока и впишите свои данные.
+   Чтобы удалить товар — сотрите его блок { ... } целиком.
+============================================================ */
+const products = [
+  { id:'p1', name:'Худи Oversize Black', cat:'худи', price:89, img:'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600&q=80', desc:'Плотный хлопок 320 г/м², свободный крой, вышитый логотип.' },
+  { id:'p2', name:'Футболка Essential White', cat:'футболки', price:39, img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&q=80', desc:'Тяжёлый хлопок, прямой силуэт, не садится после стирки.' },
+  { id:'p3', name:'Брюки Cargo Olive', cat:'брюки', price:99, img:'https://images.unsplash.com/photo-1517438476312-10d79c077509?w=600&q=80', desc:'Карго-карманы, зауженный низ, плотная ткань рип-стоп.' },
+  { id:'p4', name:'Куртка Windbreaker Purple', cat:'куртки', price:129, img:'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80', desc:'Лёгкая непродуваемая ткань, светоотражающие вставки.' },
+  { id:'p5', name:'Свитшот Minimal Grey', cat:'худи', price:74, img:'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=600&q=80', desc:'Начёс изнутри, рибана на манжетах, minimal-принт.' },
+  { id:'p6', name:'Шапка Beanie Violet', cat:'аксессуары', price:24, img:'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=600&q=80', desc:'Плотная вязка, шерсть с акрилом, один размер.' },
+];
+
+function telegramLink(name, price){
+  const text = `Здравствуйте! Хочу купить: "${name}" — €${price}. Подскажите наличие и как оформить заказ.`;
+  return `https://t.me/${MANAGER}?text=${encodeURIComponent(text)}`;
 }
 
-// ============================================
-// ПОЯВЛЕНИЕ СЕКЦИЙ ПРИ ПРОКРУТКЕ
-// ============================================
-const observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry, i) {
-        if (entry.isIntersecting) {
-            setTimeout(function() {
-                entry.target.classList.add('visible');
-            }, i * 60);
-            observer.unobserve(entry.target);
-        }
-    });
-}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+document.getElementById('headerTg').href = `https://t.me/${MANAGER}`;
+document.getElementById('heroTg').href = `https://t.me/${MANAGER}`;
 
-document.querySelectorAll('.reveal').forEach(function(el) {
-    observer.observe(el);
-});
+let activeFilter = 'все';
 
-// ============================================
-// FAQ АККОРДЕОН
-// ============================================
-document.querySelectorAll('.faq-item').forEach(function(item) {
-    item.querySelector('.faq-q').addEventListener('click', function() {
-        const isOpen = item.classList.contains('open');
-        document.querySelectorAll('.faq-item').forEach(function(i) {
-            i.classList.remove('open');
-        });
-        if (!isOpen) item.classList.add('open');
+function renderFilters(){
+  const cats = ['все', ...new Set(products.map(p=>p.cat).filter(Boolean))];
+  const el = document.getElementById('filters');
+  el.innerHTML = cats.map(c =>
+    `<button class="filter-btn ${c===activeFilter?'active':''}" data-cat="${c}">${c}</button>`
+  ).join('');
+  el.querySelectorAll('.filter-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      activeFilter = btn.dataset.cat;
+      renderGrid();
+      renderFilters();
     });
-});
+  });
+}
 
-// ============================================
-// 3D-НАКЛОН КАРТОЧЕК
-// ============================================
-document.querySelectorAll('.service-card, .work-card, .process-card, .price-card').forEach(function(card) {
-    card.addEventListener('mousemove', function(e) {
-        const rect = card.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width - 0.5;
-        const y = (e.clientY - rect.top) / rect.height - 0.5;
-        card.style.transform = 'perspective(900px) rotateY(' + (x * 6) + 'deg) rotateX(' + (-y * 6) + 'deg) translateY(-4px)';
-    });
-    card.addEventListener('mouseleave', function() {
-        card.style.transform = '';
-    });
+function renderGrid(){
+  const grid = document.getElementById('grid');
+  const list = activeFilter === 'все' ? products : products.filter(p=>p.cat===activeFilter);
+
+  if(list.length === 0){
+    grid.innerHTML = `<div class="empty-state">В этой категории пока пусто. Загляните чуть позже.</div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map((p, i) => `
+    <div class="card" style="--d:${i * 0.08}s">
+      <div class="card-img" style="background-image:url('${p.img || ''}')">
+        <span class="tag">${p.cat || 'вещь'}</span>
+      </div>
+      <div class="card-body">
+        <h3>${p.name}</h3>
+        <div class="desc">${p.desc || ''}</div>
+        <div class="card-foot">
+          <div class="price">€${p.price}</div>
+          <button class="buy-btn" onclick="window.open('${telegramLink(p.name.replace(/'/g,"\\'"), p.price)}','_blank')">Купить</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  observeCards();
+}
+
+renderFilters();
+renderGrid();
+
+/* ---- scroll-анимации: карточки, заголовки секций, шаги ---- */
+const cardObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      entry.target.classList.add('in');
+      cardObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+function observeCards(){
+  document.querySelectorAll('.card:not(.in)').forEach(card => cardObserver.observe(card));
+}
+
+const revealObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(entry=>{
+    if(entry.isIntersecting){
+      entry.target.classList.add('in');
+      revealObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+document.querySelectorAll('.step').forEach((step, i)=>{
+  step.style.setProperty('--d', `${i * 0.12}s`);
+  revealObserver.observe(step);
 });
+                             
