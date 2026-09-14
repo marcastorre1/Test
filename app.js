@@ -1,113 +1,242 @@
-document.getElementById('year').textContent = new Date().getFullYear();
+const ADMIN_PASSWORD = "marca2026";
+const MANAGER_USERNAME = "markulik52";
 
-const MANAGER = 'markulik52';
+let products = [];
+let cart = []; // {id, qty}
 
-/* ============================================================
-   ТОВАРЫ — добавляйте, меняйте и удаляйте прямо здесь.
-   Каждый товар — один объект { ... } внутри массива ниже.
-   Поля:
-     id    — уникальный текст/число, не должен повторяться
-     name  — название товара
-     cat   — категория (по ней работают фильтры сверху каталога)
-     price — цена в евро, просто число, без символа €
-     img   — ссылка на фото товара
-     desc  — короткое описание
-   Чтобы добавить товар — скопируйте один блок { ... }, вставьте
-   запятую после последнего блока и впишите свои данные.
-   Чтобы удалить товар — сотрите его блок { ... } целиком.
-============================================================ */
-const products = [
-  { id:'p1', name:'Худи Oversize Black', cat:'худи', price:89, img:'file_00000000c55081f4b6c864f8d996155f.png' },
-  { id:'p2', name:'Футболка Essential White', cat:'футболки', price:39, img:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&q=80', desc:'Тяжёлый хлопок, прямой силуэт, не садится после стирки.' },
-  { id:'p3', name:'Брюки Cargo Olive', cat:'брюки', price:99, img:'https://images.unsplash.com/photo-1517438476312-10d79c077509?w=600&q=80', desc:'Карго-карманы, зауженный низ, плотная ткань рип-стоп.' },
-  { id:'p4', name:'Куртка Windbreaker Purple', cat:'куртки', price:129, img:'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80', desc:'Лёгкая непродуваемая ткань, светоотражающие вставки.' },
-  { id:'p5', name:'Свитшот Minimal Grey', cat:'худи', price:74, img:'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=600&q=80', desc:'Начёс изнутри, рибана на манжетах, minimal-принт.' },
-  { id:'p6', name:'Шапка Beanie Violet', cat:'аксессуары', price:24, img:'https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=600&q=80', desc:'Плотная вязка, шерсть с акрилом, один размер.' },
-];
+const gridWrap = document.getElementById('gridWrap');
+const drawer = document.getElementById('drawer');
+const overlay = document.getElementById('overlay');
+const cartBtn = document.getElementById('cartBtn');
+const closeDrawer = document.getElementById('closeDrawer');
+const drawerBody = document.getElementById('drawerBody');
+const cartCount = document.getElementById('cartCount');
+const totalPrice = document.getElementById('totalPrice');
+const checkoutBtn = document.getElementById('checkoutBtn');
+const toast = document.getElementById('toast');
 
-function telegramLink(name, price){
-  const text = `Здравствуйте! Хочу купить: "${name}" — €${price}. Подскажите наличие и как оформить заказ.`;
-  return `https://t.me/${MANAGER}?text=${encodeURIComponent(text)}`;
+const loginOverlay = document.getElementById('loginOverlay');
+const logoTrigger = document.getElementById('logoTrigger');
+const cancelLogin = document.getElementById('cancelLogin');
+const submitLogin = document.getElementById('submitLogin');
+const adminPasswordInput = document.getElementById('adminPassword');
+const loginErr = document.getElementById('loginErr');
+const adminPanel = document.getElementById('adminPanel');
+const closeAdmin = document.getElementById('closeAdmin');
+const adminList = document.getElementById('adminList');
+const adminCount = document.getElementById('adminCount');
+
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 2200);
 }
 
-document.getElementById('headerTg').href = `https://t.me/${MANAGER}`;
-document.getElementById('heroTg').href = `https://t.me/${MANAGER}`;
+function fmt(n){ return n.toFixed(0) + '€'; }
 
-let activeFilter = 'все';
-
-function renderFilters(){
-  const cats = ['все', ...new Set(products.map(p=>p.cat).filter(Boolean))];
-  const el = document.getElementById('filters');
-  el.innerHTML = cats.map(c =>
-    `<button class="filter-btn ${c===activeFilter?'active':''}" data-cat="${c}">${c}</button>`
-  ).join('');
-  el.querySelectorAll('.filter-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      activeFilter = btn.dataset.cat;
-      renderGrid();
-      renderFilters();
-    });
-  });
+async function loadProducts(){
+  try{
+    const res = await window.storage.get('products', true);
+    products = res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){
+    products = [];
+  }
+  renderCatalog();
+  renderAdminList();
 }
 
-function renderGrid(){
-  const grid = document.getElementById('grid');
-  const list = activeFilter === 'все' ? products : products.filter(p=>p.cat===activeFilter);
+async function saveProducts(){
+  await window.storage.set('products', JSON.stringify(products), true);
+}
 
-  if(list.length === 0){
-    grid.innerHTML = `<div class="empty-state">В этой категории пока пусто. Загляните чуть позже.</div>`;
+function renderCatalog(){
+  if(!products.length){
+    gridWrap.innerHTML = `
+      <div class="empty-state">
+        <h3>Каталог пока пуст</h3>
+        <p>Новые вещи скоро появятся здесь. Загляните чуть позже или напишите нам в Telegram.</p>
+      </div>`;
+    return;
+  }
+  gridWrap.innerHTML = `<div class="grid">${products.map(p => `
+    <div class="card">
+      <div class="card-img"><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}" onerror="this.style.opacity=0"></div>
+      <div class="card-body">
+        <div class="card-name">${escapeHtml(p.name)}</div>
+        <div class="card-desc">${escapeHtml(p.description||'')}</div>
+        <div class="card-foot">
+          <span class="price">${fmt(p.price)}</span>
+          <button class="add-btn" onclick="addToCart('${p.id}')">В корзину</button>
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function addToCart(id){
+  const existing = cart.find(c => c.id === id);
+  if(existing){ existing.qty++; }
+  else{ cart.push({id, qty:1}); }
+  renderCart();
+  showToast('Добавлено в корзину');
+  openDrawer();
+}
+
+function changeQty(id, delta){
+  const item = cart.find(c => c.id === id);
+  if(!item) return;
+  item.qty += delta;
+  if(item.qty <= 0){ cart = cart.filter(c => c.id !== id); }
+  renderCart();
+}
+
+function removeFromCart(id){
+  cart = cart.filter(c => c.id !== id);
+  renderCart();
+}
+
+function renderCart(){
+  const totalItems = cart.reduce((s,c)=>s+c.qty,0);
+  cartCount.textContent = totalItems;
+
+  if(!cart.length){
+    drawerBody.innerHTML = `<div class="cart-empty">Корзина пуста</div>`;
+    totalPrice.textContent = fmt(0);
+    checkoutBtn.disabled = true;
     return;
   }
 
-  grid.innerHTML = list.map((p, i) => `
-    <div class="card" style="--d:${i * 0.08}s">
-      <div class="card-img" style="background-image:url('${p.img || ''}')">
-        <span class="tag">${p.cat || 'вещь'}</span>
-      </div>
-      <div class="card-body">
-        <h3>${p.name}</h3>
-        <div class="desc">${p.desc || ''}</div>
-        <div class="card-foot">
-          <div class="price">€${p.price}</div>
-          <button class="buy-btn" onclick="window.open('${telegramLink(p.name.replace(/'/g,"\\'"), p.price)}','_blank')">Купить</button>
+  let total = 0;
+  drawerBody.innerHTML = cart.map(c => {
+    const p = products.find(pr => pr.id === c.id);
+    if(!p) return '';
+    total += p.price * c.qty;
+    return `
+      <div class="cart-item">
+        <img src="${escapeHtml(p.image)}" onerror="this.style.opacity=0">
+        <div class="cart-item-info">
+          <div class="name">${escapeHtml(p.name)}</div>
+          <span class="price">${fmt(p.price)}</span>
+          <div class="qty-row">
+            <button onclick="changeQty('${p.id}',-1)">–</button>
+            <span>${c.qty}</span>
+            <button onclick="changeQty('${p.id}',1)">+</button>
+          </div>
+          <button class="remove-btn" onclick="removeFromCart('${p.id}')">Удалить</button>
         </div>
-      </div>
-    </div>
-  `).join('');
-
-  observeCards();
+      </div>`;
+  }).join('');
+  totalPrice.textContent = fmt(total);
+  checkoutBtn.disabled = false;
 }
 
-renderFilters();
-renderGrid();
+function openDrawer(){ drawer.classList.add('open'); overlay.classList.add('open'); }
+function closeDrawerFn(){ drawer.classList.remove('open'); overlay.classList.remove('open'); }
 
-/* ---- scroll-анимации: карточки, заголовки секций, шаги ---- */
-const cardObserver = new IntersectionObserver((entries)=>{
-  entries.forEach(entry=>{
-    if(entry.isIntersecting){
-      entry.target.classList.add('in');
-      cardObserver.unobserve(entry.target);
-    }
-  });
-}, { threshold: 0.15 });
+cartBtn.addEventListener('click', openDrawer);
+closeDrawer.addEventListener('click', closeDrawerFn);
+overlay.addEventListener('click', ()=>{ closeDrawerFn(); closeLogin(); });
 
-function observeCards(){
-  document.querySelectorAll('.card:not(.in)').forEach(card => cardObserver.observe(card));
-}
+checkoutBtn.addEventListener('click', () => {
+  let total = 0;
+  const lines = cart.map(c => {
+    const p = products.find(pr => pr.id === c.id);
+    if(!p) return '';
+    total += p.price * c.qty;
+    return `— ${p.name} x${c.qty} (${fmt(p.price)} шт.)`;
+  }).join('\n');
 
-const revealObserver = new IntersectionObserver((entries)=>{
-  entries.forEach(entry=>{
-    if(entry.isIntersecting){
-      entry.target.classList.add('in');
-      revealObserver.unobserve(entry.target);
-    }
-  });
-}, { threshold: 0.2 });
-
-document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-
-document.querySelectorAll('.step').forEach((step, i)=>{
-  step.style.setProperty('--d', `${i * 0.12}s`);
-  revealObserver.observe(step);
+  const text = `Здравствуйте! Хочу оформить заказ с MARCA.STORRE:\n${lines}\n\nИтого: ${fmt(total)}`;
+  const url = `https://t.me/${MANAGER_USERNAME}?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
 });
-                             
+
+/* ADMIN AUTH */
+function openLogin(){ loginOverlay.classList.add('open'); adminPasswordInput.value=''; loginErr.style.display='none'; adminPasswordInput.focus(); }
+function closeLogin(){ loginOverlay.classList.remove('open'); }
+
+/* Скрытый доступ к управлению: 5 нажатий на логотип подряд в течение 2 секунд */
+let logoClicks = 0;
+let logoClickTimer = null;
+logoTrigger.addEventListener('click', () => {
+  logoClicks++;
+  clearTimeout(logoClickTimer);
+  logoClickTimer = setTimeout(() => { logoClicks = 0; }, 2000);
+  if(logoClicks >= 5){
+    logoClicks = 0;
+    clearTimeout(logoClickTimer);
+    openLogin();
+  }
+});
+
+cancelLogin.addEventListener('click', closeLogin);
+
+submitLogin.addEventListener('click', () => {
+  if(adminPasswordInput.value === ADMIN_PASSWORD){
+    closeLogin();
+    adminPanel.classList.add('open');
+    renderAdminList();
+  }else{
+    loginErr.style.display='block';
+  }
+});
+adminPasswordInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') submitLogin.click(); });
+
+closeAdmin.addEventListener('click', () => adminPanel.classList.remove('open'));
+
+/* ADMIN PRODUCT MANAGEMENT */
+document.getElementById('addProductBtn').addEventListener('click', async () => {
+  const name = document.getElementById('pName').value.trim();
+  const price = parseFloat(document.getElementById('pPrice').value);
+  const image = document.getElementById('pImage').value.trim() || 'https://picsum.photos/seed/' + Date.now() + '/400/500';
+  const description = document.getElementById('pDesc').value.trim();
+
+  if(!name || isNaN(price)){
+    showToast('Заполните название и цену');
+    return;
+  }
+
+  products.push({ id: 'p'+Date.now(), name, price, image, description });
+  await saveProducts();
+  renderCatalog();
+  renderAdminList();
+  showToast('Товар добавлен');
+
+  document.getElementById('pName').value='';
+  document.getElementById('pPrice').value='';
+  document.getElementById('pImage').value='';
+  document.getElementById('pDesc').value='';
+});
+
+function renderAdminList(){
+  adminCount.textContent = products.length;
+  if(!products.length){
+    adminList.innerHTML = `<p style="color:var(--ink-dim);font-size:0.88rem;">Пока нет добавленных товаров.</p>`;
+    return;
+  }
+  adminList.innerHTML = products.map(p => `
+    <div class="admin-list-item">
+      <img src="${escapeHtml(p.image)}" onerror="this.style.opacity=0">
+      <div class="info">
+        <div class="n">${escapeHtml(p.name)}</div>
+        <div class="p">${fmt(p.price)}</div>
+      </div>
+      <button class="del-btn" onclick="deleteProduct('${p.id}')">Удалить</button>
+    </div>`).join('');
+}
+
+async function deleteProduct(id){
+  products = products.filter(p => p.id !== id);
+  await saveProducts();
+  renderCatalog();
+  renderAdminList();
+  showToast('Товар удалён');
+}
+
+loadProducts();
+                                                   
